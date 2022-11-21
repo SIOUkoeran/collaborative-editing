@@ -3,10 +3,22 @@ package com.example.editingserver.document
 import kotlin.math.min
 
 data class Char(
-    val position : MutableList<Identifier> = mutableListOf(),
-    val port : Int,
+    var position : MutableList<Identifier> = mutableListOf(),
+    val timestamp : Int,
     val value : String
 ) {
+    companion object {
+        fun addIdentifier(client : Int, digit : Int, cur : Char, prev : Char?) : Int{
+            return if (prev != null) {
+                cur.position.addAll(prev.position)
+                cur.position.add(Identifier(digit = digit, client))
+                digit + 1
+            } else {
+                cur.position.add(Identifier(digit = digit, client = client))
+                digit + 1
+            }
+        }
+    }
 
     fun comparePosition(p1 : MutableList<Identifier>) : Int{
         for (i : Int in 0 until min(p1.size, this.position.size)){
