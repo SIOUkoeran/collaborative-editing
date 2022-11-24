@@ -101,7 +101,7 @@ class EditingServiceImpl(
 
     private fun convertIdentifierToKey(identifier : List<Identifier>, line : Int) : Double{
         val stringBuilder = StringBuilder()
-        stringBuilder.append("0.").append(line)
+        stringBuilder.append(line).append(".")
         identifier.stream()
             .forEach { ident ->
                 stringBuilder.append(ident)
