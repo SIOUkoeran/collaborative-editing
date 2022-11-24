@@ -1,9 +1,11 @@
 package com.example.editingserver.controller
 
-import org.springframework.stereotype.Controller
+import com.example.editingserver.collaborate.service.CollaborativeService
+import org.springframework.web.bind.annotation.RestController
 
-@Controller
-class EditingController {
-
+@RestController
+class EditingController(
+    private val collaborativeService: CollaborativeService
+) {
 
 }
