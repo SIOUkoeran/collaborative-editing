@@ -2,3 +2,10 @@ spring:
   redis:
     host: localhost
     port: 6379
+
+
+jwt:
+  issuer: collaborative-eiditing
+  secret: thisiscollaborativeeditingsecret
+  expires-time: 3600
+  subject: secret

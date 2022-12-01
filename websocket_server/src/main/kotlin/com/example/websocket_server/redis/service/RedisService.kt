@@ -1,35 +1,66 @@
 package com.example.websocket_server.redis.service
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-import org.springframework.data.redis.connection.ReactiveSubscription
+import com.example.websocket_server.ObjectStringConverter
+import com.example.websocket_server.model.CreateDocument
+import com.example.websocket_server.model.DocumentDto
+import com.example.websocket_server.model.UpdateDocument
+import com.example.websocket_server.service.EditingService
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.reactive.collect
+import kotlinx.coroutines.reactor.asFlux
+import kotlinx.coroutines.reactor.mono
+import mu.KotlinLogging
+import org.springframework.boot.context.event.ApplicationStartedEvent
+import org.springframework.context.event.EventListener
 import org.springframework.data.redis.core.ReactiveRedisTemplate
-import org.springframework.data.redis.listener.ChannelTopic
-import org.springframework.messaging.simp.SimpMessagingTemplate
+import org.springframework.data.redis.core.listenToChannelAsFlow
+import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
-import javax.annotation.PostConstruct
+import reactor.core.Disposable
+import reactor.core.publisher.Mono
+import reactor.core.publisher.Mono.error
 
 @Service
 class RedisService(
     private val reactiveRedisTemplate: ReactiveRedisTemplate<String, String>,
-    private val webSocketTemplate: SimpMessagingTemplate
+    private val objectStringConverter: ObjectStringConverter,
+    private val editingService: EditingService,
 ) {
+    private val log = KotlinLogging.logger {}
 
-    private val log : Logger = LoggerFactory.getLogger(RedisService::class.java)
-
-    fun publish (topic : String, message : String) {
+    /**
+     * redis pub
+     */
+    fun publish(topic: String, message: String): Mono<Void> {
         log.info("publish message : $message to $topic")
-        reactiveRedisTemplate.convertAndSend(topic, message).subscribe()
+        return reactiveRedisTemplate.convertAndSend(topic, message).then()
     }
 
-    fun subscribe (channelTopic: String, destination : String) {
-        reactiveRedisTemplate.listenTo(ChannelTopic.of(channelTopic))
-            .map ( ReactiveSubscription.Message<String, String>::getMessage )
-            .subscribe{ message -> webSocketTemplate.convertAndSend(destination, message)}
+    /**
+     * redis sub 분기점
+     */
+    suspend fun subscribeDocument() = coroutineScope {
+        reactiveRedisTemplate.listenToChannelAsFlow("document/**")
+            .map { it.message }
+            .asFlux()
+            .flatMap { objectStringConverter.stringToObject(it, DocumentDto::class.java) }
+            .collect { message ->
+                when (message) {
+                    is UpdateDocument -> {
+                        editingService.sendUpdateDocumentMessage(message)
+                    }
+                    is CreateDocument -> {
+                        editingService.sendCreateDocumentMessage(message)
+                    }
+                    else -> error<Void?>(RuntimeException()).subscribe()
+                }
+            }
     }
 
-    @PostConstruct
-    fun subscribe() {
-        subscribe("GREEN_CHANNEL_INBOUND", "/topic/greetings")
+    @EventListener(ApplicationStartedEvent::class)
+    @Async
+    suspend fun subscribe() {
+        subscribeDocument()
     }
 }
